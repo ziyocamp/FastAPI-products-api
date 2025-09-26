@@ -14,3 +14,7 @@ def get_all_products():
 def get_one_product(product_id: int):
     return {}
 
+
+@router.put("/products/{product_id}")
+def update_one_product(product_id: int):
+    return {}
