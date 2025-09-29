@@ -13,18 +13,34 @@ router = APIRouter(
 
 @router.get("")
 def get_all_products(
-    min_price: float | None = Query(None, gt=0), 
-    max_price: float | None = Query(None, gt=0)
+    page: int = Query(1, ge=1), 
+    limit: int = Query(10, ge=10, le=100)
 ):
     db = LocalSession()
-    if min_price and max_price:
-        products = db.query(Product).filter(Product.price >= min_price, Product.price <= max_price).all()
-    elif min_price and max_price is None:
-        products = db.query(Product).filter(Product.price >= min_price).all()
-    elif min_price is None and max_price:
-        products = db.query(Product).filter(Product.price <= max_price).all()
-    else:
-        products = db.query(Product).all()
+
+    offset = (page - 1) * limit
+    products = db.query(Product).offset(offset).limit(limit).all()
+
+    result = []
+    for product in products:
+        result.append({
+            'id': product.id,
+            'name': product.name,
+            'price': product.price
+        })
+
+    return result
+
+
+@router.get("/search")
+def serach_products(
+    search: str = Query(min_length=3, max_length=50),
+):
+    
+    print(search)
+    db = LocalSession()
+    
+    products = db.query(Product).filter(Product.name.ilike(f"%{search}%")).all()
 
     result = []
     for product in products:
