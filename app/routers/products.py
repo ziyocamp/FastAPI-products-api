@@ -20,7 +20,7 @@ def get_all_products(
     page: int = Query(1, ge=1), 
     limit: int = Query(10, ge=10, le=100),
     order_by: Literal['created_at', 'updated_at'] = 'updated_at',
-    order_sort: Literal['asc', 'desc'] = 'asc'
+    order_sort: Literal['asc', 'desc'] = 'desc'
 ):
     db = LocalSession()
 
