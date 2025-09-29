@@ -1,9 +1,13 @@
+from typing import Literal
+
 from fastapi.routing import APIRouter
 from fastapi.exceptions import HTTPException
 from fastapi import status, Path, Query
+from sqlalchemy import desc
 
 from app.db.database import LocalSession
 from app.models.product import Product
+from app.schemas.products import ProductResponse, ProductListResponse, ProductSearchListResponse
 
 router = APIRouter(
     prefix="/products",
@@ -11,49 +15,55 @@ router = APIRouter(
 )
 
 
-@router.get("")
+@router.get("", response_model=ProductListResponse)
 def get_all_products(
     page: int = Query(1, ge=1), 
-    limit: int = Query(10, ge=10, le=100)
+    limit: int = Query(10, ge=10, le=100),
+    order_by: Literal['created_at', 'updated_at'] = 'updated_at',
+    order_sort: Literal['asc', 'desc'] = 'asc'
 ):
     db = LocalSession()
 
     offset = (page - 1) * limit
-    products = db.query(Product).offset(offset).limit(limit).all()
+    if order_by == "updated_at":
+        if order_sort == "desc":
+            products = db.query(Product).order_by(desc(Product.updated_at)).offset(offset).limit(limit).all()
+        else:
+            products = db.query(Product).order_by(Product.updated_at).offset(offset).limit(limit).all()
+    else:
+        if order_sort == "desc":
+            products = db.query(Product).order_by(desc(Product.created_at)).offset(offset).limit(limit).all()
+        else:
+            products = db.query(Product).order_by(Product.created_at).offset(offset).limit(limit).all()
 
-    result = []
-    for product in products:
-        result.append({
-            'id': product.id,
-            'name': product.name,
-            'price': product.price
-        })
+    total = db.query(Product).count()
 
-    return result
+    pages = total // limit + (1 if total % limit != 0 else 0)
+
+    return ProductListResponse(products=products, total=total, limit=limit, pages=pages, page=page)
 
 
-@router.get("/search")
+@router.get("/search", response_model=ProductSearchListResponse)
 def serach_products(
     search: str = Query(min_length=3, max_length=50),
 ):
-    
-    print(search)
     db = LocalSession()
     
     products = db.query(Product).filter(Product.name.ilike(f"%{search}%")).all()
 
-    result = []
-    for product in products:
-        result.append({
-            'id': product.id,
-            'name': product.name,
-            'price': product.price
-        })
-
-    return result
+    return ProductSearchListResponse(products=products)
 
 
-@router.get("/{product_id}")
+
+@router.get("/orderby", response_model=ProductSearchListResponse)
+def order_products():
+    db = LocalSession()
+    
+    products = db.query(Product).order_by(Product.updated_at).all()
+
+    return ProductSearchListResponse(products=products)
+
+@router.get("/{product_id}", response_model=ProductResponse)
 def get_one_product(product_id: int = Path(gt=0)):
     db = LocalSession()
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -61,10 +71,7 @@ def get_one_product(product_id: int = Path(gt=0)):
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="bunday product mavjud emas.")
 
-    return {
-        'id': product.id,
-        'name': product.name
-    }
+    return product
 
 
 @router.put("/{product_id}")
